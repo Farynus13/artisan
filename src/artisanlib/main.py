@@ -718,6 +718,7 @@ from artisanlib.comm import serialport, colorport, scaleport
 from artisanlib.pid_dialogs import (PXRpidDlgControl, PXG4pidDlgControl,
     PID_DlgControl, DTApidDlgControl)
 from artisanlib.pid_control import FujiPID, PIDcontrol, DtaPID
+from artisanlib.mpc_control import MPCcontrol
 from artisanlib.widgets import (MyQLCDNumber, EventPushButton, MajorEventPushButton,
     AnimatedMajorEventPushButton, MinorEventPushButton, AuxEventPushButton, ClickableLCDFrame)
 
@@ -1669,6 +1670,9 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
 
         # PID control for Arduino, Hottop and generic MODBUS devices
         self.pidcontrol:PIDcontrol = PIDcontrol(self)
+
+        # MPC control for predictive control using LSTM model
+        self.mpccontrol:MPCcontrol = MPCcontrol(self)
 
         #### Hottop Control
         self.HottopControlActive:bool = False
