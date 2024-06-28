@@ -1,8 +1,12 @@
 import time
 import numpy
+import random
 import scipy.signal # type:ignore[import-untyped]
 import logging
 from typing import Final, List, Optional, Callable
+
+#import for keras model, load model
+from keras.models import load_model,Model
 
 from artisanlib.filters import LiveSosFilter
 
@@ -15,10 +19,14 @@ _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 # expects a function control that takes a value from [<outMin>,<outMax>] to control the heater as called on each update()
 class MPC:
-    __slots__ = []
+    __slots__ = ['mpcSemaphore','outMin','outMax','dutySteps','dutyMin','dutyMax','control','lastOutput','iterations_since_duty','force_duty',
+                 'active','target','model','modelPath', 'yellowingTemp','FCtemp','DROPtemp','yellowingTime','FCtime','DROPtime']
 
-    def __init__(self, control:Callable[[float], None]=lambda _: None) -> None:
+    def __init__(self, control:Callable[[float], None]=lambda _: None, modelPath:str = "",
+                 yellowingTemp:float = 160, FCtemp:float = 198, DROPtemp:float = 211,yellowingTime:float = 300,
+                FCtime:float = 555,DROPtime:float = 700) -> None:
         self.mpcSemaphore:QSemaphore = QSemaphore(1)
+        self.active:bool = False
 
         self.outMin:int = 0 # minimum output value
         self.outMax:int = 100 # maximum output value
@@ -27,15 +35,20 @@ class MPC:
         self.dutyMax:int = 100
         self.control:Callable[[float], None] = control
 
-        self.lastOutput:Optional[float] = None # used to reinitialize the Iterm and to apply simple moving average on the derivative part in derivative_on_measurement mode
+        self.lastOutput:Optional[float] = None
 
         #MPC - LSTM Variables
         #
         #
         #
-        #
-        #
-        #
+        self.modelPath:Optional[str] = modelPath # used to reinitialize the model to use for prediction        
+        self.model:Optional[Model] = None
+        self.yellowingTemp:float = yellowingTemp # goal yellowing temperature to reach in °C
+        self.FCtemp:float = FCtemp
+        self.DROPtemp:float = DROPtemp
+        self.yellowingTime:float = yellowingTime # time to reach yellowing temperature in seconds
+        self.FCtime:float = FCtime
+        self.DROPtime:float = DROPtime
         #-----------------------------------------------------------------------------------
 
     ### External API guarded by semaphore
@@ -66,18 +79,16 @@ class MPC:
                     self.mpcSemaphore.release(1)
 
     # update control value (the mpc loop is running even if MPC is inactive, just the control function is only called if active)
-    def update(self, i:Optional[float]) -> None:
+    def update(self,et,bt,tx) -> None:
         try:
-            if i == -1 or i is None:
-                # reject error values
-                return
             self.mpcSemaphore.acquire(1)
            
             #TODO: create MPC control function here to control the heater
             #
             #          HERE IS THE MPC CONTROL FUNCTION
             #
-            output = 0 ### MPC control function here to control the heater
+            #mock for now with changing output value between as random value between outMax and outMin
+            output = random.uniform(self.outMin, self.outMax)
 
             # clamp output to [outMin,outMax]
             if output > self.outMax:
@@ -86,11 +97,9 @@ class MPC:
                 output = self.outMin
 
             int_output = int(round(min(self.dutyMax,max(self.dutyMin,output))))
-            if self.lastOutput is None or self.iterations_since_duty >= self.force_duty or int_output >= self.lastOutput + self.dutySteps or int_output <= self.lastOutput - self.dutySteps:
-                if self.active:
-                    self.control(int_output)
-                    self.iterations_since_duty = 0
-                self.lastOutput = output # kept to initialize Iterm on reactivating the PID
+            if self.active:
+                self.control(int_output)
+                self.iterations_since_duty = 0
             self.iterations_since_duty += 1
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
@@ -136,10 +145,19 @@ class MPC:
             if self.mpcSemaphore.available() < 1:
                 self.mpcSemaphore.release(1)
 
-    def setMPC(self) -> None:
+    def setMPC(self, modelPath:str, yellowingTemp:float, FCtemp:float, DROPtemp:float, 
+    yellowingTime:float, FCtime:float, DROPtime:float) -> None:
         try:
             self.mpcSemaphore.acquire(1)
             #TODO: set the MPC parameters here
+
+            self.modelPath = modelPath  
+            self.yellowingTemp = yellowingTemp
+            self.FCtemp = FCtemp
+            self.DROPtemp = DROPtemp
+            self.yellowingTime = yellowingTime
+            self.FCtime = FCtime
+            self.DROPtime = DROPtime 
         finally:
             if self.mpcSemaphore.available() < 1:
                 self.mpcSemaphore.release(1)

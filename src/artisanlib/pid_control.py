@@ -1368,6 +1368,9 @@ class PIDcontrol:
     # if send_command is False, the pidOn command is not forwarded to the external PID (TC4, Kaleido, ..)
     def pidOn(self, send_command:bool = True) -> None:
         if self.aw.qmc.flagon:
+            if self.aw.mpccontrol.mpcActive:
+                self.aw.mpccontrol.mpcOff()
+                self.aw.mpccontrol.mpcActive = False
             if not self.pidActive:
                 self.aw.sendmessage(QApplication.translate('StatusBar','PID ON'))
             self.pidModeInit()

@@ -73,35 +73,69 @@ class PID_DlgControl(ArtisanDialog):
         tab0Layout = QVBoxLayout()
         mpcGrp = QGroupBox(QApplication.translate('GroupBox','MPC'))
         
+        mpcActiveGrp = QGroupBox(QApplication.translate('GroupBox','MPC Active'))
+        self.mpcActive = QCheckBox(QApplication.translate('CheckBox','Activate MPC control (Overrides PID control)'))
+        self.mpcActive.setChecked(self.aw.qmc.mpcflag)
+        self.mpcActive.stateChanged.connect(self.mpcActiveSlot)
+        self.mpcActive.setToolTip(QApplication.translate('Tooltip','Activate MPC control (Overrides PID control)'))
+        mpcActiveBox = QHBoxLayout()
+        mpcActiveBox.addWidget(self.mpcActive)
+        mpcActiveBox.addStretch()
+        mpcActiveGrp.setLayout(mpcActiveBox)
+
+        #labels time and temp for each goal
+        mpcTimeLabel = QLabel(QApplication.translate('Label','Time'))
+        mpcTempLabel = QLabel(QApplication.translate('Label','Temp'))
+
         #create 3 goal spinboxes for MPC control
         #MPC control will be trying to optimize for the closest goal in time 
-        # (e.g. it will start with the yellowing goal and then switch to FC and DROP)
+        # (e.g. it will start with the DRY goal and then switch to FC and DROP)
         # these values will be inputed by user as his goal for particular roast
-        self.mpcYellowing = QDoubleSpinBox()
-        self.mpcYellowing.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.mpcYellowing.setRange(.0,230.)
-        self.mpcYellowing.setSingleStep(.1)
-        self.mpcYellowing.setDecimals(1)
-        self.mpcYellowing.setValue(self.aw.mpccontrol.mpcYellowing)
-        mpcYellowingLabel = QLabel('Yellowing')
-        self.mpcFC = QDoubleSpinBox()
-        self.mpcFC.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.mpcFC.setRange(.0,230.)
-        self.mpcFC.setSingleStep(.1)
-        self.mpcFC.setDecimals(1)
-        self.mpcFC.setValue(self.aw.mpccontrol.mpcFC)
+        self.mpcDRYTemp = QDoubleSpinBox()
+        self.mpcDRYTemp.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mpcDRYTemp.setRange(.0,230.)
+        self.mpcDRYTemp.setSingleStep(.1)
+        self.mpcDRYTemp.setDecimals(1)
+        self.mpcDRYTemp.setValue(self.aw.mpccontrol.mpcDRYTemp)
+        self.mpcDRYTime = QDoubleSpinBox()        
+        self.mpcDRYTime.setAlignment(Qt.AlignmentFlag.AlignRight);
+        self.mpcDRYTime.setRange(.0,999.)
+        self.mpcDRYTime.setSingleStep(.1)
+        self.mpcDRYTime.setDecimals(1)
+        self.mpcDRYTime.setValue(self.aw.mpccontrol.mpcDRYTime)
+        mpcDRYLabel = QLabel('DRY')
+
+        self.mpcFCTemp = QDoubleSpinBox()
+        self.mpcFCTemp.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mpcFCTemp.setRange(.0,230.)
+        self.mpcFCTemp.setSingleStep(.1)
+        self.mpcFCTemp.setDecimals(1)
+        self.mpcFCTemp.setValue(self.aw.mpccontrol.mpcFCTemp)
+        self.mpcFCTime = QDoubleSpinBox()
+        self.mpcFCTime.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mpcFCTime.setRange(.0,999)
+        self.mpcFCTime.setSingleStep(.1)
+        self.mpcFCTime.setDecimals(1)
+        self.mpcFCTime.setValue(self.aw.mpccontrol.mpcFCTime)
         mpcFCLabel = QLabel('FC')
-        self.mpcDROP = QDoubleSpinBox()
-        self.mpcDROP.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.mpcDROP.setRange(.0,230.)
-        self.mpcDROP.setSingleStep(.1)
-        self.mpcDROP.setDecimals(1)
-        self.mpcDROP.setValue(self.aw.mpccontrol.mpcDROP)
+
+        self.mpcDROPTemp = QDoubleSpinBox()
+        self.mpcDROPTemp.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mpcDROPTemp.setRange(.0,230.)
+        self.mpcDROPTemp.setSingleStep(.1)
+        self.mpcDROPTemp.setDecimals(1)
+        self.mpcDROPTemp.setValue(self.aw.mpccontrol.mpcDROPTemp)
+        self.mpcDROPTime = QDoubleSpinBox()
+        self.mpcDROPTime.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mpcDROPTime.setRange(.0,999)
+        self.mpcDROPTime.setSingleStep(.1)
+        self.mpcDROPTime.setDecimals(1)
+        self.mpcDROPTime.setValue(self.aw.mpccontrol.mpcDROPTime)
         mpcDROPLabel = QLabel('DROP')
 
-        mpcSetMPC = QPushButton(QApplication.translate('Button','Set'))
+        mpcSetGoal = QPushButton(QApplication.translate('Button','Set'))
         #mpcSetMPC.clicked.connect(self.mpcConf)
-        mpcSetMPC.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        mpcSetGoal.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self.startMPConCHARGE = QCheckBox(QApplication.translate('CheckBox', 'Start MPC on CHARGE'))
         self.startMPConCHARGE.setToolTip(QApplication.translate('Tooltip', 'Automatically turn the MPC ON on CHARGE'))
@@ -109,20 +143,26 @@ class PID_DlgControl(ArtisanDialog):
 
         mpcGoalGrp = QGroupBox(QApplication.translate('GroupBox','Goal'))
         mpcGoalBox = QGridLayout()
-        mpcGoalBox.addWidget(mpcYellowingLabel,0,0)
-        mpcGoalBox.addWidget(mpcFCLabel,1,0)
-        mpcGoalBox.addWidget(mpcDROPLabel,2,0)
-        mpcGoalBox.addWidget(self.mpcYellowing,0,1)
-        mpcGoalBox.addWidget(self.mpcFC,1,1)
-        mpcGoalBox.addWidget(self.mpcDROP,2,1)
-        mpcGoalBox.addWidget(mpcSetMPC,5,0,1,2)
+        mpcGoalBox.addWidget(mpcTimeLabel,0,1)
+        mpcGoalBox.addWidget(mpcTempLabel,0,2)
+        mpcGoalBox.addWidget(mpcDRYLabel,1,0)
+        mpcGoalBox.addWidget(mpcFCLabel,2,0)
+        mpcGoalBox.addWidget(mpcDROPLabel,3,0)
+        mpcGoalBox.addWidget(self.mpcDRYTemp,1,1)
+        mpcGoalBox.addWidget(self.mpcFCTemp,2,1)
+        mpcGoalBox.addWidget(self.mpcDROPTemp,3,1)
+        mpcGoalBox.addWidget(self.mpcDRYTime,1,2)
+        mpcGoalBox.addWidget(self.mpcFCTime,2,2)
+        mpcGoalBox.addWidget(self.mpcDROPTime,3,2)
+        mpcGoalBox.addWidget(mpcSetGoal,4,0,2,3)
         mpcGoalGrp.setLayout(mpcGoalBox)        
 
         # Slider
         mpcTargetSliderLabel = QLabel(QApplication.translate('Label', 'Slider'))
         self.mpcTargetSlider = QComboBox()
         self.mpcTargetSlider.addItems(['None',self.aw.qmc.etypesf(0),self.aw.qmc.etypesf(1),self.aw.qmc.etypesf(2),self.aw.qmc.etypesf(3)])
-        self.mpcTargetSlider.setCurrentIndex(0)
+        self.mpcTargetSlider.setCurrentIndex(self.aw.mpccontrol.target)
+        self.mpcTargetSlider.currentIndexChanged.connect(self.updateMPCTargetSlider)
         self.mpcTargetSlider.setToolTip(QApplication.translate('Tooltip', 'Slider to be set by the MPC duty signal'))
         mpcTargetSliderBox = QHBoxLayout()
         mpcTargetSliderBox.addStretch()
@@ -131,7 +171,7 @@ class PID_DlgControl(ArtisanDialog):
         mpcTargetSliderBox.addStretch()
         #Range Limit
         self.mpcTargetRangeLimitFlag = QCheckBox()
-        self.mpcTargetRangeLimitFlag.setChecked(False)
+        self.mpcTargetRangeLimitFlag.setChecked(self.aw.mpccontrol.targetRangeLimit)
         #mpcTargetRangeLimitFlag.stateChanged.connect(self.mpcTargetRangeLimitSlot)
         self.mpcTargetRangeLimitFlag.setToolTip(QApplication.translate('Tooltip', 'Activate range limit for MPC output slider'))
         mpcTargetRangeLimitLabel = QLabel(QApplication.translate('Label', 'Limit'))
@@ -205,15 +245,40 @@ class PID_DlgControl(ArtisanDialog):
         mpcDutyBox.addWidget(self.mpcDutyMin,0,1)
         mpcDutyBox.addWidget(mpcDutyMaxLabel,1,0)
         mpcDutyBox.addWidget(self.mpcDutyMax,1,1)
+        mpcDutyBox.addWidget(mpcDutyStepsLabel,2,0)
+        mpcDutyBox.addWidget(self.mpcDutySteps,2,1)
         mpcDutyGrp.setLayout(mpcDutyBox)
         
+        #model group
+        mpcModelGrp = QGroupBox(QApplication.translate('GroupBox','Model'))
+        mpcModelPathLabel = QLabel(QApplication.translate('Label','Model Path'))
+        self.mpcModelPath = QLineEdit() # model path to the model to use for prediction
+        self.mpcModelPath.setText(self.aw.mpccontrol.modelPath) 
+        self.mpcModelPathSet = QPushButton(QApplication.translate('Button','Set')) # set model path
+        self.mpcModelPathSet.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        mpcModelBox = QHBoxLayout()
+        mpcModelBox.addWidget(mpcModelPathLabel)
+        mpcModelBox.addWidget(self.mpcModelPath,2)
+        mpcModelBox.addWidget(self.mpcModelPathSet)
+        mpcModelBox.addStretch()
+        mpcModelGrp.setLayout(mpcModelBox)
+
+        #create events
+        self.mpcCreateEvents = QCheckBox(QApplication.translate('CheckBox', 'Create Events'))
+        self.mpcCreateEvents.setChecked(self.aw.mpccontrol.createEvents)
+        self.mpcCreateEvents.setToolTip(QApplication.translate('Tooltip', 'Generated an event mark on each output slider change\ninitiated by the MPC'))
+
+
         #mpcgrid with size 5x2
         mpcGrid = QGridLayout()
         mpcGrp.setLayout(mpcGrid)
-        mpcGrid.addWidget(mpcGoalGrp,0,0,2,2)
+        mpcGrid.addWidget(mpcActiveGrp,0,0,1,2)
+        mpcGrid.addWidget(mpcGoalGrp,1,0,2,2)
         mpcGrid.addWidget(self.startMPConCHARGE,6,0,1,2)
-        mpcGrid.addWidget(mpcTargetGrp,0,2,1,2)
-        mpcGrid.addWidget(mpcDutyGrp,1,2,1,2)
+        mpcGrid.addWidget(self.mpcCreateEvents,6,2,1,2)
+        mpcGrid.addWidget(mpcTargetGrp,1,2,1,2)
+        mpcGrid.addWidget(mpcDutyGrp,2,2,1,2)
+        mpcGrid.addWidget(mpcModelGrp,3,0,1,4)
 
         tab0Layout.addWidget(mpcGrp)
         tab0Layout.addStretch()     
@@ -221,11 +286,7 @@ class PID_DlgControl(ArtisanDialog):
         #connects
 
         self.mpcTargetSlider.currentIndexChanged.connect(self.updateMPCtargetLimits)        
-        # mpcTargetRangeLimitFlag.stateChanged.connect(self.mpcTargetRangeLimitSlot)
-        # mpcDutyMin.valueChanged.connect(self.dutyMinValueChangedSlot)
-        # mpcDutyMax.valueChanged.connect(self.dutyMaxValueChangedSlot)
-        # mpcSetMPC.clicked.connect(self.mpcConf)
-        # self.startMPConCHARGE.stateChanged.connect(self.startMPConCHARGESlot)
+        self.mpcTargetRangeLimitFlag.stateChanged.connect(self.mpcTargetRangeLimitSlot)
 
         # PID tab
         tab1Layout = QVBoxLayout()
@@ -979,14 +1040,10 @@ class PID_DlgControl(ArtisanDialog):
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
         # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(10, self.setActiveTab)
-
-    #TODO:Write MPC slots
-    # mpcTargetSlider.currentIndexChanged.connect(self.updateMPCtargetLimits)        
-    # mpcTargetRangeLimitFlag.stateChanged.connect(self.mpcTargetRangeLimitSlot)
-    # mpcDutyMin.valueChanged.connect(self.dutyMinValueChangedSlot)
-    # mpcDutyMax.valueChanged.connect(self.dutyMaxValueChangedSlot)
-    # mpcSetMPC.clicked.connect(self.mpcConf)
-    # self.startMPConCHARGE.stateChanged.connect(self.startMPConCHARGESlot)
+    
+    @pyqtSlot(int)
+    def updateMPCTargetSlider(self, i:int) -> None:
+        self.aw.mpccontrol.target = i
 
     @pyqtSlot(int)
     def updateMPCtargetLimits(self, i:int) -> None:
@@ -996,24 +1053,35 @@ class PID_DlgControl(ArtisanDialog):
             slider_min = 0
             slider_max = 100
             self.mpcTargetRangeLimitFlag.setEnabled(False)
-            self.mpcDutyMin.setEnabled(False)
-            self.mpcDutyMax.setEnabled(False)
+            self.mpcTargetRangeLimitMax.setEnabled(False)
+            self.mpcTargetRangeLimitMin.setEnabled(False)
         else:
             slidernr = self.aw.mpccontrol.target - 1
             slider_min = self.aw.eventslidermin[slidernr]
             slider_max = self.aw.eventslidermax[slidernr]
             self.mpcTargetRangeLimitFlag.setEnabled(True)
-            self.mpcDutyMin.setEnabled(self.aw.mpccontrol.targetRangeLimit)
-            self.mpcDutyMax.setEnabled(self.aw.mpccontrol.targetRangeLimit)
-        self.mpcDutyMin.setRange(slider_min, slider_max)
-        self.mpcDutyMax.setRange(slider_min, slider_max)
+            self.mpcTargetRangeLimitMin.setEnabled(self.aw.mpccontrol.targetRangeLimit)
+            self.mpcTargetRangeLimitMax.setEnabled(self.aw.mpccontrol.targetRangeLimit)
+        self.mpcTargetRangeLimitMin.setRange(slider_min, slider_max)
+        self.mpcTargetRangeLimitMax.setRange(slider_min, slider_max)
 
 
+    @pyqtSlot(int)
+    def mpcTargetRangeLimitSlot(self, i:int) -> None:
+        self.aw.mpccontrol.targetRangeLimit = bool(i)
+        self.mpcTargetRangeLimitMin.setEnabled(self.aw.mpccontrol.targetRangeLimit)
+        self.mpcTargetRangeLimitMax.setEnabled(self.aw.mpccontrol.targetRangeLimit)
 
+    @pyqtSlot(int)
+    def mpcActiveSlot(self, i:int) -> None:
+        self.aw.mpccontrol.mpcActive = bool(i)
+        self.aw.qmc.mpcflag = self.aw.mpccontrol.mpcActive
+        self.mpcTargetRangeLimitFlag.setEnabled(self.aw.mpccontrol.mpcActive)
+        self.mpcDutyMin.setEnabled(self.aw.mpccontrol.mpcActive)
+        self.mpcDutyMax.setEnabled(self.aw.mpccontrol.mpcActive)
+        self.mpcTargetRangeLimitMin.setEnabled(self.aw.mpccontrol.mpcActive)
+        self.mpcTargetRangeLimitMax.setEnabled(self.aw.mpccontrol.mpcActive)
     
-
-
-    #
     @pyqtSlot()
     def setActiveTab(self) -> None:
         self.tabWidget.setCurrentIndex(self.activeTab)
@@ -1034,11 +1102,17 @@ class PID_DlgControl(ArtisanDialog):
 
     @pyqtSlot(bool)
     def pidONAction(self, _:bool = False) -> None:
-        self.aw.pidcontrol.pidOn()
+        if not self.aw.qmc.mpcflag:
+            self.aw.pidcontrol.pidOn()
+        else:
+            self.aw.mpccontrol.mpcOn()
 
     @pyqtSlot(bool)
     def pidOFFAction(self, _:bool = False) -> None:
-        self.aw.pidcontrol.pidOff()
+        if not self.aw.qmc.mpcflag:
+            self.aw.pidcontrol.pidOff()
+        else:
+            self.aw.mpccontrol.mpcOff()
 
     @pyqtSlot(bool)
     def okAction(self, _:bool = False) -> None:
@@ -1352,6 +1426,27 @@ class PID_DlgControl(ArtisanDialog):
             self.aw.pidcontrol.setDutySteps(self.pidDutySteps.value())
 
     def close(self) -> bool:
+        #mpc control
+        DRYTemp = self.mpcDRYTemp.value()
+        FCTemp = self.mpcFCTemp.value()
+        DROPTemp = self.mpcDROPTemp.value()
+        DRYTime = self.mpcDRYTime.value() 
+        FCTime = self.mpcFCTime.value()
+        DROPPTime = self.mpcDROPTime.value()
+        mpcModelPath = self.mpcModelPath.text()
+        mpcSource:Optional[int] = None
+        self.aw.mpccontrol.setMPC(DRYTemp,FCTemp,DROPTemp,DRYTime,FCTime,DROPPTime,mpcSource,mpcModelPath)
+        self.aw.mpccontrol.mpcOnCHARGE = self.startMPConCHARGE.isChecked()
+        self.aw.qmc.mpcflag = self.mpcActive.isChecked()
+        self.aw.mpccontrol.targetMin = self.mpcTargetRangeLimitMin.value()
+        self.aw.mpccontrol.targetMax = self.mpcTargetRangeLimitMax.value()
+        self.aw.mpccontrol.targetRangeLimit = self.mpcTargetRangeLimitFlag.isChecked()
+        self.aw.mpccontrol.dutyMin = min(self.mpcDutyMin.value(),self.mpcDutyMax.value())
+        self.aw.mpccontrol.dutyMax = max(self.mpcDutyMin.value(),self.mpcDutyMax.value())        
+        self.aw.mpccontrol.dutySteps = self.mpcDutySteps.value()
+        self.aw.mpccontrol.createEvents = self.mpcCreateEvents.isChecked()
+
+        #pid control
         kp = self.pidKp.value() # 5.00
         ki = self.pidKi.value() # 0.15
         kd = self.pidKd.value() # 0.00

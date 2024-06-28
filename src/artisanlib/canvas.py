@@ -60,7 +60,7 @@ from artisanlib.util import (uchr, fill_gaps, deltaLabelPrefix, deltaLabelUTF8, 
         fromFtoC, fromFtoCstrict, fromCtoF, fromCtoFstrict, RoRfromFtoC, RoRfromFtoCstrict, RoRfromCtoF, toInt, toString,
         toFloat, application_name, getResourcePath, getDirectory, convertWeight,
         abbrevString, scaleFloat2String, is_proper_temp, weight_units, volume_units, float2float)
-from artisanlib import pid
+from artisanlib import pid,mpc
 from artisanlib.time import ArtisanTime
 from artisanlib.filters import LiveMedian
 from artisanlib.dialogs import ArtisanMessageBox
@@ -1307,6 +1307,11 @@ class tgraphcanvas(FigureCanvas):
         self.safesaveflag:bool = False
 
         self.pid = pid.PID()
+        
+        #MPC
+        self.mpc = mpc.MPC()
+        self.mpcflag:bool = False
+
 
         #background profile
         self.background:bool = False # set to True if loaded background profile is shown and False if hidden
@@ -3827,7 +3832,13 @@ class tgraphcanvas(FigureCanvas):
                     # as now the software PID is also update while the PID is off (if configured).
                     if (self.Controlbuttonflag and \
                             not self.aw.pidcontrol.externalPIDControl()): # any device and + Artisan Software PID lib
-                        if self.aw.pidcontrol.pidSource in {0, 1}:
+                        
+                        if self.mpcflag:
+                            #mpc requires historical data to predict future values we need bt,et, also burner and time
+                            #TODO: provide mpc with burner data
+                            self.mpc.update(temp1_readings,temp2_readings,timex_readings)
+                            # MPC control (override PID)
+                        elif self.aw.pidcontrol.pidSource in {0, 1}:
                             self.pid.update(st2) # smoothed BT
                         elif self.aw.pidcontrol.pidSource == 2:
                             self.pid.update(st1) # smoothed ET

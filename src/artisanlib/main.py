@@ -8947,7 +8947,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                                         # 2. call setpid(self,k) with k that active pid
                                         self.fujipid.setpidPXF(N,kp,ki,kd)
                             else:
-                                self.pidcontrol.confPID(kp,ki,kd,pOnE=self.pidcontrol.pOnE)
+                                    self.pidcontrol.confPID(kp,ki,kd,pOnE=self.pidcontrol.pOnE)
                                 #self.pidcontrol.setPID(kp,ki,kd) # we don't set the new values in the dialog
                 elif action == 12: # Fuji Command (currently only "write(<unitId>,<register>,<value>)" is supported
                     if cmd_str:
@@ -22775,7 +22775,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
         else:
             modifiers = QApplication.keyboardModifiers()
             if modifiers == Qt.KeyboardModifier.ControlModifier:
-                self.pidcontrol.togglePID()
+                if not self.qmc.mpcflag: # if MPC is active,the PID control is not available
+                    self.pidcontrol.togglePID()
+                else:
+                    self.mpccontrol.toggleMPC()
             else:
                 dialog = PID_DlgControl(self,self,self.PID_DlgControl_activeTab)
                 #modeless style dialog

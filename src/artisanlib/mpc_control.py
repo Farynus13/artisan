@@ -24,18 +24,24 @@ _log: Final[logging.Logger] = logging.getLogger(__name__)
 ###################################################################################
  
 class MPCcontrol:
-    __slots__ = ['aw','mpcActive','mpcYellowing','mpcFC','mpcDROP','dutySteps','dutyMin','dutyMax','targetRangeLimit','targetMin','targetMax','target',
-'slider_force_move','createEvents','mpcSource','time_mpcON']
+    __slots__ = ['aw','mpcActive','mpcDRYTemp','mpcFCTemp','mpcDROPTemp','mpcDRYTime','mpcFCTime','mpcDROPTime',
+                 'dutySteps','dutyMin','dutyMax','targetRangeLimit','targetMin','targetMax','target',
+                    'slider_force_move','createEvents','mpcSource','time_mpcON','modelPath','mpcOnCHARGE']
 
     def __init__(self, aw: 'ApplicationWindow') -> None:
         self.aw:ApplicationWindow = aw
         self.mpcActive:bool = False
+        self.mpcOnCHARGE:bool = False
 
         self.createEvents:bool = False
 
-        self.mpcYellowing:float = 160
-        self.mpcFC:float = 198
-        self.mpcDROP:float = 212
+        self.mpcDRYTemp:float = 160
+        self.mpcFCTemp:float = 198
+        self.mpcDROPTemp:float = 211
+        self.mpcDRYTime:float = 300
+        self.mpcFCTime:float = 555
+        self.mpcDROPTime:float = 700
+
 
         self.dutySteps:int = 1
         self.dutyMin:int = 0
@@ -50,6 +56,8 @@ class MPCcontrol:
 
         self.slider_force_move:bool = True # if True move the slider independent of the slider position to fire slider action!
 
+        self.modelPath:str = None # used to reinitialize the model to use for prediction
+        
     def toggleMPC(self) -> None:
         if self.mpcActive:
             self.mpcOff()
@@ -79,7 +87,7 @@ class MPCcontrol:
             heat = int(round(float(numpy.interp(vx,[0,100],[heat_min,heat_max]))))
             heat = self.aw.applySliderStepSize(slidernr, heat) # quantify by slider step size
             self.aw.addEventSignal.emit(heat,slidernr,self.createEvents,True,self.slider_force_move)
-            self.aw.qmc.slider_force_move = False
+            self.aw.qmc.slider_force_move = True
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
 
@@ -87,7 +95,7 @@ class MPCcontrol:
     def confSoftwareMPC(self) -> None:
         if self.externalPIDControl() not in [1, 2, 4] and not(self.aw.qmc.device == 19 and self.aw.qmc.PIDbuttonflag) and self.aw.qmc.Controlbuttonflag:
             # software PID
-            self.aw.qmc.mpc.setMPC()
+            self.aw.qmc.mpc.setMPC(self.mpcSource,self.modelPath) 
             self.aw.qmc.mpc.setLimits(self.targetMin,self.targetMax) 
             self.aw.qmc.mpc.setDutySteps(self.dutySteps)
             self.aw.qmc.mpc.setDutyMin(self.dutyMin)
@@ -96,6 +104,9 @@ class MPCcontrol:
 
     def mpcOn(self) -> None:
         if self.aw.qmc.flagon:
+            if self.aw.pidcontrol.pidActive:
+                self.aw.pidcontrol.pidOff()
+                self.aw.pidcontrol.pidActive = False
             if not self.mpcActive:
                 self.aw.sendmessage(QApplication.translate('StatusBar','MPC ON'))
             self.mpcModeInit()
@@ -103,7 +114,7 @@ class MPCcontrol:
             self.slider_force_move = True
 
             if self.aw.qmc.Controlbuttonflag:
-                self.aw.qmc.mpc.setMPC()
+                self.aw.qmc.mpc.setMPC(self.modelPath,self.mpcDRYTemp,self.mpcFCTemp,self.mpcDROPTemp,self.mpcDRYTime,self.mpcFCTime,self.mpcDROPTime)
                 self.aw.qmc.mpc.setLimits(self.targetMin,self.targetMax)
                 self.aw.qmc.mpc.setDutySteps(self.dutySteps)
                 self.aw.qmc.mpc.setDutyMin(self.dutyMin)
@@ -132,19 +143,39 @@ class MPCcontrol:
             self.aw.qmc.mpc.setDutySteps(dutySteps)
 
     # just store the mpc configuration TODO: for now pass, later when we start implementing mpc we will have things to set here
-    def setMPC(self,source:Optional[int] = None) -> None:
+    def setMPC(self, DRYTemp:float, FCTemp:float, DROPTemp:float, DRYTime:float, FCTime:float, DROPTime:float, 
+               modelPath:str, source:Optional[int] = None) -> None:
+        self.mpcDRYTemp = DRYTemp
+        self.mpcFCTemp = FCTemp
+        self.mpcDROPTemp = DROPTemp
+        self.mpcDRYTime = DRYTime
+        self.mpcFCTime = FCTime
+        self.mpcDROPTime = DROPTime
+        self.modelPath = modelPath
         if source is not None:
             self.mpcSource = source
 
     # send conf to connected MPC
-    def confMPC(self, source:Optional[int] = None) -> None:
+    def confMPC(self, DRYTemp:float, FCTemp:float, DROPTemp:float, DRYTime:float, FCTime:float, DROPTime:float, 
+               modelPath:str, source:Optional[int] = None) -> None:
         if self.aw.qmc.Controlbuttonflag: # in all other cases if the "Control" flag is ticked
-            self.aw.qmc.mpc.setMPC() #TODO: for now pass, later when we start implementing mpc we will have things to set here
+            self.aw.qmc.mpc.setMPC( DRYTemp, FCTemp, DROPTemp, DRYTime, FCTime, DROPTime, modelPath)    
+            self.mpcDRYTemp = DRYTemp
+            self.mpcFCTemp = FCTemp
+            self.mpcDROPTemp = DROPTemp
+            self.mpcDRYTime = DRYTime
+            self.mpcFCTime = FCTime
+            self.mpcDROPTime = DROPTime
+            self.modelPath = modelPath
 
-            self.aw.qmc.mpc.setLimits(self.targetMin,self.targetMax) 
+            self.aw.qmc.mpc.setLimits(0,100) 
             if source is not None and source>0:
                 self.mpcSource = source
             self.aw.sendmessage(QApplication.translate('Message','mpc updated'))
+
+    def setModelPath(self, path:str) -> None:
+        if path is not None:
+            self.modelPath = path
 
 
         
