@@ -1310,7 +1310,7 @@ class tgraphcanvas(FigureCanvas):
         
         #MPC
         self.mpc = mpc.MPC()
-        self.mpcflag:bool = False
+        self.mpcflag:bool = True
 
 
         #background profile
@@ -3834,10 +3834,34 @@ class tgraphcanvas(FigureCanvas):
                             not self.aw.pidcontrol.externalPIDControl()): # any device and + Artisan Software PID lib
                         
                         if self.mpcflag:
-                            #mpc requires historical data to predict future values we need bt,et, also burner and time
-                            #TODO: provide mpc with burner data
-                            self.mpc.update(temp1_readings,temp2_readings,timex_readings)
                             # MPC control (override PID)
+                            #mpc requires historical data to predict future values we need bt,et, also burner and time
+                            if self.aw.mpccontrol.target is not None:
+                                if self.aw.mpccontrol.target == 1:
+                                    target_time = self.E1timex
+                                    target_values = self.E1values
+                                elif self.aw.mpccontrol.target == 2:
+                                    target_time = self.E2timex
+                                    target_values = self.E2values
+                                elif self.aw.mpccontrol.target == 3:
+                                    target_time = self.E3timex
+                                    target_values = self.E3values
+                                elif self.aw.mpccontrol.target == 4:
+                                    target_time = self.E4timex
+                                    target_values = self.E4values
+                                else:
+                                    target_time = None
+                                    target_values = None
+                            else:
+                                target_time = None
+                                target_values = None
+
+                            charge_idx = self.timeindex[0]
+                            event_pos_offset = self.eventpositionbars[0]
+                            event_pos_factor = self.eventpositionbars[1] - self.eventpositionbars[0]
+                            
+                            self.mpc.update(temp1_readings,temp2_readings,timex_readings,target_time,target_values,self.delay,charge_idx,event_pos_offset,event_pos_factor)
+                                
                         elif self.aw.pidcontrol.pidSource in {0, 1}:
                             self.pid.update(st2) # smoothed BT
                         elif self.aw.pidcontrol.pidSource == 2:
@@ -12534,7 +12558,10 @@ class tgraphcanvas(FigureCanvas):
                                 message = QApplication.translate('Message','Not enough data collected yet. Try again in a few seconds')
                                 self.aw.sendmessage(message)
                                 return
-                            if self.aw.pidcontrol.pidOnCHARGE and not self.aw.pidcontrol.pidActive: # Arduino/TC4, Hottop, MODBUS
+                            if self.mpcflag:
+                                if self.aw.mpccontrol.mpcOnCHARGE and not self.aw.mpccontrol.mpcActive:
+                                    self.aw.mpccontrol.mpcOn()
+                            elif self.aw.pidcontrol.pidOnCHARGE and not self.aw.pidcontrol.pidActive: # Arduino/TC4, Hottop, MODBUS
                                 self.aw.pidcontrol.pidOn()
                         if self.chargeTimerPeriod > 0:
                             self.aw.setTimerColor('timer')

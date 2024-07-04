@@ -126,3 +126,5 @@ libusb-package==1.0.26.1; platform_system=='Windows'
 #Added by me - mpc packages
 tensorflow == 2.15.0
 keras == 2.15.0
+scikit-learn ==1.0.2
+joblib == 1.1.0

@@ -31,9 +31,9 @@ class MPCcontrol:
     def __init__(self, aw: 'ApplicationWindow') -> None:
         self.aw:ApplicationWindow = aw
         self.mpcActive:bool = False
-        self.mpcOnCHARGE:bool = False
+        self.mpcOnCHARGE:bool = True
 
-        self.createEvents:bool = False
+        self.createEvents:bool = True
 
         self.mpcDRYTemp:float = 160
         self.mpcFCTemp:float = 198
@@ -56,7 +56,7 @@ class MPCcontrol:
 
         self.slider_force_move:bool = True # if True move the slider independent of the slider position to fire slider action!
 
-        self.modelPath:str = None # used to reinitialize the model to use for prediction
+        self.modelPath:str = "./model.keras" # used to reinitialize the model to use for prediction
         
     def toggleMPC(self) -> None:
         if self.mpcActive:
@@ -101,6 +101,7 @@ class MPCcontrol:
             self.aw.qmc.mpc.setDutyMin(self.dutyMin)
             self.aw.qmc.mpc.setDutyMax(self.dutyMax)
             self.aw.qmc.mpc.setControl(self.setEnergy)
+
 
     def mpcOn(self) -> None:
         if self.aw.qmc.flagon:

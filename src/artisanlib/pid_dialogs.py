@@ -98,7 +98,7 @@ class PID_DlgControl(ArtisanDialog):
         self.mpcDRYTemp.setDecimals(1)
         self.mpcDRYTemp.setValue(self.aw.mpccontrol.mpcDRYTemp)
         self.mpcDRYTime = QDoubleSpinBox()        
-        self.mpcDRYTime.setAlignment(Qt.AlignmentFlag.AlignRight);
+        self.mpcDRYTime.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.mpcDRYTime.setRange(.0,999.)
         self.mpcDRYTime.setSingleStep(.1)
         self.mpcDRYTime.setDecimals(1)
@@ -139,7 +139,8 @@ class PID_DlgControl(ArtisanDialog):
 
         self.startMPConCHARGE = QCheckBox(QApplication.translate('CheckBox', 'Start MPC on CHARGE'))
         self.startMPConCHARGE.setToolTip(QApplication.translate('Tooltip', 'Automatically turn the MPC ON on CHARGE'))
-        #self.startMPConCHARGE.setChecked(self.aw.mpccontrol.mpcOnCHARGE)
+        self.startMPConCHARGE.setChecked(self.aw.mpccontrol.mpcOnCHARGE)
+    
 
         mpcGoalGrp = QGroupBox(QApplication.translate('GroupBox','Goal'))
         mpcGoalBox = QGridLayout()
@@ -407,7 +408,7 @@ class PID_DlgControl(ArtisanDialog):
         pidGridBox.addLayout(pidGrid)
         pidGridBox.addLayout(pidVBox)
         if pid_controller == 0: # Output configuration only for internal PID
-            #PID target (only shown if internal PID for hottop/modbus/TC4 is active
+            #PID target (only  n if internal PID for hottop/modbus/TC4 is active
             controlItems = ['None',self.aw.qmc.etypesf(0),self.aw.qmc.etypesf(1),self.aw.qmc.etypesf(2),self.aw.qmc.etypesf(3)]
             #positiveControl
             positiveControlLabel = QLabel(QApplication.translate('Label','Positive'))
@@ -1432,10 +1433,10 @@ class PID_DlgControl(ArtisanDialog):
         DROPTemp = self.mpcDROPTemp.value()
         DRYTime = self.mpcDRYTime.value() 
         FCTime = self.mpcFCTime.value()
-        DROPPTime = self.mpcDROPTime.value()
+        DROPTime = self.mpcDROPTime.value()
         mpcModelPath = self.mpcModelPath.text()
         mpcSource:Optional[int] = None
-        self.aw.mpccontrol.setMPC(DRYTemp,FCTemp,DROPTemp,DRYTime,FCTime,DROPPTime,mpcSource,mpcModelPath)
+        self.aw.mpccontrol.setMPC(DRYTemp,FCTemp,DROPTemp,DRYTime,FCTime,DROPTime,mpcModelPath,mpcSource)
         self.aw.mpccontrol.mpcOnCHARGE = self.startMPConCHARGE.isChecked()
         self.aw.qmc.mpcflag = self.mpcActive.isChecked()
         self.aw.mpccontrol.targetMin = self.mpcTargetRangeLimitMin.value()
