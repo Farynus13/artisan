@@ -3836,31 +3836,19 @@ class tgraphcanvas(FigureCanvas):
                         if self.mpcflag:
                             # MPC control (override PID)
                             #mpc requires historical data to predict future values we need bt,et, also burner and time
-                            if self.aw.mpccontrol.target is not None:
-                                if self.aw.mpccontrol.target == 1:
-                                    target_time = self.E1timex
-                                    target_values = self.E1values
-                                elif self.aw.mpccontrol.target == 2:
-                                    target_time = self.E2timex
-                                    target_values = self.E2values
-                                elif self.aw.mpccontrol.target == 3:
-                                    target_time = self.E3timex
-                                    target_values = self.E3values
-                                elif self.aw.mpccontrol.target == 4:
-                                    target_time = self.E4timex
-                                    target_values = self.E4values
-                                else:
-                                    target_time = None
-                                    target_values = None
-                            else:
-                                target_time = None
-                                target_values = None
+                            #get indexes  of events that are type of self.mpccontrol.target
+                            eventsIdx = []
+                            eventsValue = []
+                            for i in range(len(self.specialeventstype)):
+                                if self.specialeventstype[i] == self.aw.mpccontrol.target-1:
+                                    eventsIdx.append(self.specialevents[i])
+                                    eventsValue.append(self.specialeventsvalue[i])
 
                             charge_idx = self.timeindex[0]
                             event_pos_offset = self.eventpositionbars[0]
                             event_pos_factor = self.eventpositionbars[1] - self.eventpositionbars[0]
                             
-                            self.mpc.update(temp1_readings,temp2_readings,timex_readings,target_time,target_values,self.delay,charge_idx,event_pos_offset,event_pos_factor)
+                            self.mpc.update(self.temp1,self.temp2,self.timex,eventsValue,eventsIdx,self.delay/1000,charge_idx)
                                 
                         elif self.aw.pidcontrol.pidSource in {0, 1}:
                             self.pid.update(st2) # smoothed BT

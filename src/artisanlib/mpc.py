@@ -59,7 +59,7 @@ class MPC:
         self.step:float = 5. # time step in seconds
         self.input_horizon:int = int(6*60/self.step) # number of input horizon steps (hardcoded to 6 minutes)
         self.output_horizon:int = int(6*60/self.step) # number of output horizon steps hardcoded to 6 minutes, but will change based on next milestone (DRY, FC, DROP)
-        self.min_input_length:int = int(10/self.step)
+        self.min_input_length:int = int(5/self.step)
 
         #-----------------------------------------------------------------------------------
 
@@ -91,29 +91,26 @@ class MPC:
                     self.mpcSemaphore.release(1)
 
     # update control value (the mpc loop is running even if MPC is inactive, just the control function is only called if active)
-    def update(self,et,bt,tx,targetTime,targetValues,delay,charge_idx,target_offset,target_factor) -> None:
+    def update(self,et,bt,timex,eventsValue,eventsIdx,delay,charge_idx) -> None:
         try: 
             self.mpcSemaphore.acquire(1)
             if self.active and charge_idx != -1 and \
-                targetTime is not None and targetValues is not None and \
-                len(targetTime) == len(targetValues) > 0 and \
-                len(et[charge_idx:]) / self.step >= self.min_input_length:
-                targetValues = [((x - target_offset) / target_factor) for x in targetValues]
+                len(bt[charge_idx:]) / self.step >= self.min_input_length:
 
-                # len(et[charge_idx:]) / self.step >= self.min_input_length: # check if enough data is available to make a prediction
-                # predictionData = self.preprocessData(et,bt,targetTime,targetValues,delay,charge_idx) # preprocess data for prediction
+                predictionData = self.preprocessData(et,bt,eventsValue,eventsIdx,delay,charge_idx) # preprocess data for prediction
                 # output = self.findOptimalDuty(predictionData) # find optimal duty value to reach DRY / FC / DROP temperature in the right time
-                output = targetValues[-1] + 1
-                # clamp output to [outMin,outMax]
-                if output > self.outMax:
-                    output = self.outMax
-                elif output < self.outMin:
-                    output = self.outMin
+                output = random.randint(0,100) # for now just return random duty value
+                if output is not None: # if output is None, do nothing
 
-                int_output = int(round(min(self.dutyMax,max(self.dutyMin,output))))
-                self.control(int_output)
-                self.iterations_since_duty = 0
-                self.lastOutput = output # kept to initialize Iterm on reactivating the PID
+                    # clamp output to [outMin,outMax]
+                    if output > self.outMax:
+                        output = self.outMax
+                    elif output < self.outMin:
+                        output = self.outMin
+
+                    int_output = int(round(min(self.dutyMax,max(self.dutyMin,output))))
+                    self.control(int_output)
+                    self.iterations_since_duty = 0
             self.iterations_since_duty += 1
 
         except Exception as e: # pylint: disable=broad-except
@@ -122,36 +119,52 @@ class MPC:
             if self.mpcSemaphore.available() < 1:
                 self.mpcSemaphore.release(1)
 
-    def preprocessData(self,et,bt,targetTime,targetValues,delay,charge_idx) -> List[List[float]]:
-        et = et[charge_idx:]
-        bt = bt[charge_idx:]
-        burner = [0]*len(et)
-        i = 0
-        for timex,valuex in zip(targetTime,targetValues):
-            while i < len(burner) and i*delay <= timex:
-                burner[i] = valuex
+    def preprocessData(self,et,bt,eventsValue,eventsIdx,delay,charge_idx) -> List[List[float]]:
+        try:
+            et = et[charge_idx:]
+            bt = bt[charge_idx:]
+            i = 0
+            while eventsIdx[i] < charge_idx:
                 i += 1
-        if i < len(burner):
+            eventsIdx = eventsIdx[i:]
+            eventsValue = eventsValue[i:] 
+            eventsIdx = [x - charge_idx for x in eventsIdx]
+
+            burner = [0]*len(et)
+            i = 0
+            last_v = eventsValue[0]
+            for idx,v in zip(eventsIdx,eventsValue):
+                while i < len(burner) and i <= idx:
+                    burner[i] = last_v
+                    i += 1
+                last_v = v
+
             while i < len(burner):
                 burner[i] = burner[i-1]
                 i += 1
-
-        roast = np.array([et,bt,burner]).T
-        roast = self.xScaler.transform(roast) # scale input data for prediction to [0,1] return roast
-        for j in range(int(roast.shape[0]/self.step-self.min_input_length-1)):
-            x_temp = roast[:(j+self.min_input_length)*self.step][::self.step]
-            if x_temp.shape[0] >= self.input_horizon:
-                x_temp = x_temp[x_temp.shape[0]-self.input_horizon:]
+            
+            roast = np.array([et,bt,burner]).T
+            roast = self.xScaler.transform(roast) # scale input data for prediction to [0,1] return roast
+            roast = roast[::int(self.step/delay)]
+            if roast.shape[0] >= self.input_horizon:
+                roast = roast[roast.shape[0]-self.input_horizon:]
             else:
-                x_temp = np.pad(x_temp, ((self.input_horizon - x_temp.shape[0], 0), (0, 0)), mode='constant')
+                roast = np.pad(roast, ((self.input_horizon - roast.shape[0], 0), (0, 0)), mode='constant')
 
-        return np.expand_dims(x_temp,0)
-        # return None
+            return np.expand_dims(roast,0)
+        except Exception as e:
+            _log.exception(f"Could not preprocess data for prediction. Error: {e}") 
+
+        return None
     
     def findOptimalDuty(self,predictionData) -> float:
         if self.modelLoaded and predictionData is not None:
             #perform optimization over the space of duty values over time to reach the target temperature in the right time
-            pass
+            ga = GeneticAlgorithm(pop_size=100, num_timesteps=48, burner_options=burner_options, desired_accuracy=0.5)
+            optimal_burner_settings = ga.run(predictionData, target_bt)
+            return optimal_burner_settings[0]
+        return None
+            
             
 
     # bring the mpc to its initial state (to be called externally)
@@ -294,3 +307,76 @@ class MPC:
         else:
             _log.info('Incorrect model path')                                      
 
+class GeneticAlgorithm:
+    def __init__(self,model, pop_size, num_timesteps, burner_options, desired_accuracy, num_generations=50, num_parents=20, mutation_rate=0.01):
+        self.model = model
+        self.pop_size = pop_size
+        self.num_timesteps = num_timesteps
+        self.burner_options = burner_options
+        self.desired_accuracy = desired_accuracy
+        self.num_generations = num_generations
+        self.num_parents = num_parents
+        self.mutation_rate = mutation_rate
+        self.population = self.initialize_population()
+
+    def initialize_population(self):
+        return [[random.choice(self.burner_options) for _ in range(self.num_timesteps)] for _ in range(self.pop_size)]
+
+    def evaluate_population(self, current_state, target_bt):
+        return [self.objective_function(self.predict_system(current_state, individual), target_bt) for individual in self.population]
+
+    def predict_system(self, current_state, burner_settings):
+        current_batch = current_state
+        predictions = []
+        for i in range(self.num_timesteps):
+            current_pred = self.model.predict(current_batch)[0]
+            current_pred = np.append(current_pred, [burner_settings[i]])
+            predictions.append(current_pred)
+            current_batch = np.roll(current_batch, -1, axis=1)
+            current_batch[0,-1,:]=current_pred
+
+        return predictions
+
+    def objective_function(self, predicted_state, target_bt):
+        bt = predicted_state[-1,0] # last time step of predicted state is the target bt
+        return abs(bt - target_bt)  # for now just return the absolute difference between the predicted and target bt
+        #later on we can add things like penalties for changing burner settings too often or too much, etc.
+
+    def select_parents(self, fitness_scores):
+        return random.choices(self.population, weights=[1/f for f in fitness_scores], k=self.num_parents)
+
+
+    def crossover(self, parents, offspring_size):
+        offspring = []
+        for _ in range(offspring_size):
+            parent1, parent2 = random.sample(parents, 2)
+            crossover_point = random.randint(1, len(parent1) - 1)
+            child = parent1[:crossover_point] + parent2[crossover_point:]
+            offspring.append(child)
+        return offspring
+
+    def mutate(self, offspring):
+        for individual in offspring:
+            if random.random() < self.mutation_rate:
+                mutate_point = random.randint(0, len(individual) - 1)
+                individual[mutate_point] = random.choice(self.burner_options)
+        return offspring
+
+    def run(self, current_state, target_bt):
+        for generation in range(self.num_generations):
+            fitness_scores = self.evaluate_population(current_state, target_bt)
+            best_fitness = min(fitness_scores)
+
+            # Check the stopping condition
+            if best_fitness <= self.desired_accuracy:
+                break
+
+            parents = self.select_parents(fitness_scores)
+            offspring_size = self.pop_size - len(parents)
+            offspring = self.crossover(parents, offspring_size)
+            offspring = self.mutate(offspring)
+            self.population = parents + offspring
+
+        best_individual_index = fitness_scores.index(best_fitness)
+
+        return self.population[best_individual_index]
