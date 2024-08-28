@@ -43,20 +43,20 @@ class MPCcontrol:
         self.mpcDROPTime:float = 700
 
 
-        self.dutySteps:int = 1
-        self.dutyMin:int = 0
-        self.dutyMax:int = 100
-        self.targetRangeLimit:bool = False 
+        self.dutySteps:int = 5
+        self.dutyMin:int = 5
+        self.dutyMax:int = 45
+        self.targetRangeLimit:bool = False
         self.targetMin:int = 0
         self.targetMax:int = 100
-        self.target:int = 0
+        self.target:int = 4
 
         self.mpcSource:int = 1
         self.time_mpcON:float = 0
 
         self.slider_force_move:bool = True # if True move the slider independent of the slider position to fire slider action!
 
-        self.modelPath:str = "./model.keras" # used to reinitialize the model to use for prediction
+        self.modelPath:str = "./model.onnx" # used to reinitialize the model to use for prediction
         
     def toggleMPC(self) -> None:
         if self.mpcActive:
